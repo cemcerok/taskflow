@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException, status
-from app.schemas.task import TaskResponse, TaskCreate
+from app.schemas.task import TaskResponse, TaskCreate, TaskChange
 
 router = APIRouter()
 
@@ -44,3 +44,12 @@ def get_task_by_id(task_id: int):
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Task not found"
         )
+
+@router.put("/tasks/{task_id}", response_model=TaskResponse)
+def change_task(task_id: int, task_change: TaskChange):
+    task = get_task_by_id(task_id)
+
+    task["title"] = task_change.title
+    task["completed"] = task_change.completed
+
+    return task
