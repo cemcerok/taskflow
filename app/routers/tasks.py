@@ -53,3 +53,9 @@ def change_task(task_id: int, task_change: TaskChange):
     task["completed"] = task_change.completed
 
     return task
+
+@router.delete("/tasks/{task_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_task(task_id: int):
+    task = get_task_by_id(task_id)
+
+    tasks.remove(task)
