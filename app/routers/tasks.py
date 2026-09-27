@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException, status
-from app.schemas.task import TaskResponse, TaskCreate, TaskChange
+from app.schemas.task import TaskResponse, TaskCreate, TaskChange, TaskPatch
 
 router = APIRouter()
 
@@ -59,3 +59,15 @@ def delete_task(task_id: int):
     task = get_task_by_id(task_id)
 
     tasks.remove(task)
+
+@router.patch("/tasks/{task_id}", response_model=TaskResponse, status_code=status.HTTP_200_OK)
+def patch_task(task_id: int,task_patch:TaskPatch):
+    task = get_task_by_id(task_id)
+
+    if task_patch.title is not None:
+        task["title"] = task_patch.title
+
+    if task_patch.completed is not None:
+        task["completed"] = task_patch.completed
+
+    return task
