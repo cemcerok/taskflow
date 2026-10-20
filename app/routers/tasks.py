@@ -1,73 +1,74 @@
-from fastapi import APIRouter, HTTPException, status
-from app.schemas.task import TaskResponse, TaskCreate, TaskChange, TaskPatch
+from typing import Annotated
+
+from fastapi import APIRouter, Depends, HTTPException, Response, status
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.db.database import get_db
+from app.repositories import task as task_repository
+from app.schemas.task import TaskChange, TaskCreate, TaskPatch, TaskResponse
 
 router = APIRouter()
+DatabaseSession = Annotated[AsyncSession, Depends(get_db)]
 
-
-tasks = [
-    {
-        "id": 1,
-        "title": "...",
-        "completed": False
-    },
-    {
-        "id": 2,
-        "title": "...",
-        "completed": True
-    }
-]
 
 @router.get("/tasks", response_model=list[TaskResponse])
-def get_tasks():
-    return tasks
+async def get_tasks(session: DatabaseSession):
+    return await task_repository.get_tasks(session)
+
 
 @router.post("/tasks", status_code=status.HTTP_201_CREATED, response_model=TaskResponse)
-def create_task(task: TaskCreate):
-    id_list = list(i["id"] for i in tasks)
-    if len(id_list):
-        max_id = max(id_list)
-    else:
-        max_id = 0
+async def create_task(task: TaskCreate, session: DatabaseSession):
+    return await task_repository.create_task(session, task)
 
-    task_dict = {"id": max_id + 1, **task.model_dump()}
-    tasks.append(task_dict)
-
-    return task_dict
 
 @router.get("/tasks/{task_id}", response_model=TaskResponse)
-def get_task_by_id(task_id: int):
-    for task in tasks:
-        if task["id"] == task_id:
-            return task
-    else:
+async def get_task_by_id(task_id: int, session: DatabaseSession):
+    task = await task_repository.get_task_by_id(session, task_id)
+    if task is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Task not found"
+            detail="Task not found",
         )
+    return task
+
 
 @router.put("/tasks/{task_id}", response_model=TaskResponse)
-def change_task(task_id: int, task_change: TaskChange):
-    task = get_task_by_id(task_id)
+async def change_task(
+    task_id: int,
+    task_change: TaskChange,
+    session: DatabaseSession,
+):
+    task = await task_repository.get_task_by_id(session, task_id)
+    if task is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Task not found",
+        )
+    return await task_repository.update_task(session, task, task_change)
 
-    task["title"] = task_change.title
-    task["completed"] = task_change.completed
 
-    return task
+@router.patch("/tasks/{task_id}", response_model=TaskResponse)
+async def patch_task(
+    task_id: int,
+    task_patch: TaskPatch,
+    session: DatabaseSession,
+):
+    task = await task_repository.get_task_by_id(session, task_id)
+    if task is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Task not found",
+        )
+    return await task_repository.patch_task(session, task, task_patch)
+
 
 @router.delete("/tasks/{task_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_task(task_id: int):
-    task = get_task_by_id(task_id)
-
-    tasks.remove(task)
-
-@router.patch("/tasks/{task_id}", response_model=TaskResponse, status_code=status.HTTP_200_OK)
-def patch_task(task_id: int,task_patch:TaskPatch):
-    task = get_task_by_id(task_id)
-
-    if task_patch.title is not None:
-        task["title"] = task_patch.title
-
-    if task_patch.completed is not None:
-        task["completed"] = task_patch.completed
-
-    return task
+async def delete_task(task_id: int, session: DatabaseSession) -> Response:
+    task = await task_repository.get_task_by_id(session, task_id)
+    if task is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Task not found",
+        )
+    await task_repository.delete_task(session, task)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

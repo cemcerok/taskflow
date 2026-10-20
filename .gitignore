@@ -3,5 +3,6 @@ __pycache__/
 *.pyc
 .vscode/
 .env
+.pytest_cache/
 .DS_Store
 Thumbs.db
